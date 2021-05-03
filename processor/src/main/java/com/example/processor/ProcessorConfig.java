@@ -28,8 +28,13 @@ public class ProcessorConfig {
 //        return newProcessorSubscription(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
 //    }
 
+//    @Bean
+//    public ProcessorSubscription retryProcessorSubscription(HelloTaskProcessorRetrySync processor) {
+//        return newProcessorSubscriptionWithRetry(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+//    }
+
     @Bean
-    public ProcessorSubscription retryProcessorSubscription(HelloTaskProcessorRetrySync processor) {
+    public ProcessorSubscription retryAsyncProcessorSubscription(HelloTaskProcessorRetryASync processor) {
         return newProcessorSubscriptionWithRetry(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
     }
 
