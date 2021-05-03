@@ -29,7 +29,7 @@ public class ProcessorConfig {
 //    }
 
     @Bean
-    public ProcessorSubscription retryProcessorSubscription(RetryTaskProcessorSync processor) {
+    public ProcessorSubscription retryProcessorSubscription(HelloTaskProcessorRetrySync processor) {
         return newProcessorSubscriptionWithRetry(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
     }
 

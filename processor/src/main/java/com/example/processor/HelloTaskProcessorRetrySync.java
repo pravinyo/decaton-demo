@@ -14,8 +14,8 @@ import java.time.LocalDateTime;
 import java.util.TimeZone;
 
 @Component
-public class RetryTaskProcessorSync implements DecatonProcessor<Tasks.HelloTask> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(RetryTaskProcessorSync.class);
+public class HelloTaskProcessorRetrySync implements DecatonProcessor<Tasks.HelloTask> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(HelloTaskProcessorRetrySync.class);
 
     @Override
     public void process(ProcessingContext<Tasks.HelloTask> context, Tasks.HelloTask task) throws InterruptedException {
