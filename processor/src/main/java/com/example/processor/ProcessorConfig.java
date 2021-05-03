@@ -2,6 +2,7 @@ package com.example.processor;
 
 import java.util.Properties;
 
+import com.linecorp.decaton.processor.runtime.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,13 +12,6 @@ import com.google.protobuf.GeneratedMessageV3;
 import com.google.protobuf.Parser;
 
 import com.linecorp.decaton.processor.DecatonProcessor;
-import com.linecorp.decaton.processor.ProcessorProperties;
-import com.linecorp.decaton.processor.ProcessorsBuilder;
-import com.linecorp.decaton.processor.Property;
-import com.linecorp.decaton.processor.PropertySupplier;
-import com.linecorp.decaton.processor.StaticPropertySupplier;
-import com.linecorp.decaton.processor.runtime.ProcessorSubscription;
-import com.linecorp.decaton.processor.runtime.SubscriptionBuilder;
 import com.linecorp.decaton.protobuf.ProtocolBuffersDeserializer;
 
 @Configuration
@@ -46,7 +40,9 @@ public class ProcessorConfig {
 
         PropertySupplier propertySupplier =
                 StaticPropertySupplier.of(
+                        // Per Partition 10 consumer threads
                         Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY, 10),
+                        // Allow max pending records
                         Property.ofStatic(ProcessorProperties.CONFIG_MAX_PENDING_RECORDS, 100));
 
         return SubscriptionBuilder.newBuilder(subscriptionId)
