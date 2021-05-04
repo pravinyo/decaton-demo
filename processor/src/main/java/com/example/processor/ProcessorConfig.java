@@ -1,25 +1,22 @@
 package com.example.processor;
 
-import java.time.Duration;
-import java.util.Properties;
-import java.util.function.Supplier;
-
+import com.example.protocol.Tasks.HelloTask;
+import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.Parser;
+import com.linecorp.decaton.processor.DecatonProcessor;
 import com.linecorp.decaton.processor.processors.CompactionProcessor;
 import com.linecorp.decaton.processor.runtime.*;
+import com.linecorp.decaton.protobuf.ProtocolBuffersDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.example.protocol.Tasks.HelloTask;
-import com.google.protobuf.GeneratedMessageV3;
-import com.google.protobuf.Parser;
+import java.time.Duration;
+import java.util.Properties;
 
-import com.linecorp.decaton.processor.DecatonProcessor;
-import com.linecorp.decaton.protobuf.ProtocolBuffersDeserializer;
-
-import static com.linecorp.decaton.processor.processors.CompactionProcessor.*;
+import static com.linecorp.decaton.processor.processors.CompactionProcessor.CompactChoice;
 
 @Configuration
 public class ProcessorConfig {
@@ -51,12 +48,17 @@ public class ProcessorConfig {
 //        return newProcessorSubscriptionWithRateLimiting(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
 //    }
 
+//    @Bean
+//    public ProcessorSubscription compactionProcessorSubscription(HelloTaskProcessor processor) {
+//        return newProcessorSubscriptionWithCompaction(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+//    }
+
     @Bean
-    public ProcessorSubscription compactionProcessorSubscription(HelloTaskProcessor processor) {
-        return newProcessorSubscriptionWithCompaction(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+    public ProcessorSubscription ignoreKeysProcessorSubscription(HelloTaskProcessor processor) {
+        return newProcessorSubscriptionWithKeyIgnore(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
     }
 
-    private static Properties propertyConfig(){
+    private static Properties propertyConfig() {
         Properties config = new Properties();
         config.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, CLIENT_ID);
         config.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
@@ -69,7 +71,7 @@ public class ProcessorConfig {
 
         ProcessorsBuilder<T> processorsBuilder =
                 ProcessorsBuilder.consuming(topic, new ProtocolBuffersDeserializer<>(parser))
-                                 .thenProcess(processor);
+                        .thenProcess(processor);
 
         PropertySupplier propertySupplier =
                 StaticPropertySupplier.of(
@@ -79,10 +81,10 @@ public class ProcessorConfig {
                         Property.ofStatic(ProcessorProperties.CONFIG_MAX_PENDING_RECORDS, 100));
 
         return SubscriptionBuilder.newBuilder(subscriptionId)
-                                  .processorsBuilder(processorsBuilder)
-                                  .consumerConfig(propertyConfig())
-                                  .properties(propertySupplier)
-                                  .buildAndStart();
+                .processorsBuilder(processorsBuilder)
+                .consumerConfig(propertyConfig())
+                .properties(propertySupplier)
+                .buildAndStart();
     }
 
     private static <T extends GeneratedMessageV3> ProcessorSubscription newProcessorSubscriptionWithRetry(
@@ -162,7 +164,7 @@ public class ProcessorConfig {
                 .buildAndStart();
     }
 
-    private static CompactionProcessor<HelloTask> createCompactionProcessor(){
+    private static CompactionProcessor<HelloTask> createCompactionProcessor() {
         return new CompactionProcessor<>(1000L, (left, right) -> {
             if (left.task().getCreatedAt().getNanos() == right.task().getCreatedAt().getNanos()) {
                 return CompactChoice.PICK_EITHER;
@@ -172,5 +174,26 @@ public class ProcessorConfig {
                 return CompactChoice.PICK_RIGHT;
             }
         });
+    }
+
+    private static <T extends GeneratedMessageV3> ProcessorSubscription newProcessorSubscriptionWithKeyIgnore(
+            String subscriptionId, String topic, Parser<T> parser, DecatonProcessor<T> processor) {
+
+        ProcessorsBuilder<T> processorsBuilder =
+                ProcessorsBuilder.consuming(topic, new ProtocolBuffersDeserializer<>(parser))
+                        .thenProcess(processor);
+
+        PropertySupplier propertySupplier =
+                StaticPropertySupplier.of(
+                        Property.ofStatic(ProcessorProperties.CONFIG_IGNORE_KEYS, IgnoreKeyList.getKeysToIgnore()),
+                        Property.ofStatic(ProcessorProperties.CONFIG_PROCESSING_RATE, 2L),
+                        Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY, 10),
+                        Property.ofStatic(ProcessorProperties.CONFIG_MAX_PENDING_RECORDS, 20));
+
+        return SubscriptionBuilder.newBuilder(subscriptionId)
+                .processorsBuilder(processorsBuilder)
+                .consumerConfig(propertyConfig())
+                .properties(propertySupplier)
+                .buildAndStart();
     }
 }
