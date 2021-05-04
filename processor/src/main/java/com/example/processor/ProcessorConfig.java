@@ -33,9 +33,14 @@ public class ProcessorConfig {
 //        return newProcessorSubscriptionWithRetry(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
 //    }
 
+//    @Bean
+//    public ProcessorSubscription retryAsyncProcessorSubscription(HelloTaskProcessorRetryASync processor) {
+//        return newProcessorSubscriptionWithRetry(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+//    }
+
     @Bean
-    public ProcessorSubscription retryAsyncProcessorSubscription(HelloTaskProcessorRetryASync processor) {
-        return newProcessorSubscriptionWithRetry(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+    public ProcessorSubscription rateLimitProcessorSubscription(HelloTaskProcessor processor) {
+        return newProcessorSubscriptionWithRateLimiting(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
     }
 
     private static <T extends GeneratedMessageV3> ProcessorSubscription newProcessorSubscription(
@@ -79,6 +84,29 @@ public class ProcessorConfig {
 
         return SubscriptionBuilder.newBuilder(subscriptionId)
                 .enableRetry(RetryConfig.withBackoff(Duration.ofMillis(100)))
+                .processorsBuilder(processorsBuilder)
+                .consumerConfig(propertyConfig())
+                .properties(propertySupplier)
+                .buildAndStart();
+    }
+
+    private static <T extends GeneratedMessageV3> ProcessorSubscription newProcessorSubscriptionWithRateLimiting(
+            String subscriptionId, String topic, Parser<T> parser, DecatonProcessor<T> processor) {
+
+        ProcessorsBuilder<T> processorsBuilder =
+                ProcessorsBuilder.consuming(topic, new ProtocolBuffersDeserializer<>(parser))
+                        .thenProcess(processor);
+
+        PropertySupplier propertySupplier =
+                StaticPropertySupplier.of(
+                        // When the processing rate reaches configured rate limit, rate limiter
+                        // will slow down the processing rather than discarding tasks.
+                        // Decaton’s rate limiter allows sudden increase in traffic.
+                        Property.ofStatic(ProcessorProperties.CONFIG_PROCESSING_RATE, 2L),
+                        Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY, 10),
+                        Property.ofStatic(ProcessorProperties.CONFIG_MAX_PENDING_RECORDS, 20));
+
+        return SubscriptionBuilder.newBuilder(subscriptionId)
                 .processorsBuilder(processorsBuilder)
                 .consumerConfig(propertyConfig())
                 .properties(propertySupplier)
