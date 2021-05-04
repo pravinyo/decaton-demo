@@ -102,6 +102,14 @@ public class ProcessorConfig {
                         // When the processing rate reaches configured rate limit, rate limiter
                         // will slow down the processing rather than discarding tasks.
                         // Decaton’s rate limiter allows sudden increase in traffic.
+                        //
+                        //0 => Stop all processing but the task currently being processed isn’t interrupted
+                        //
+                        //-1 (default) => Unlimited
+                        //
+                        //Any positive number => Do the best to process tasks with the given value per second.
+                        // Note that the actual processing rate may not reach the given value if a task takes
+                        // over a second to process or the value is greater than actual throughput per second.
                         Property.ofStatic(ProcessorProperties.CONFIG_PROCESSING_RATE, 2L),
                         Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY, 10),
                         Property.ofStatic(ProcessorProperties.CONFIG_MAX_PENDING_RECORDS, 20));
