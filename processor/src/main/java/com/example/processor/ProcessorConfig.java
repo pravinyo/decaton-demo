@@ -2,9 +2,13 @@ package com.example.processor;
 
 import java.time.Duration;
 import java.util.Properties;
+import java.util.function.Supplier;
 
+import com.linecorp.decaton.processor.processors.CompactionProcessor;
 import com.linecorp.decaton.processor.runtime.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,8 +19,12 @@ import com.google.protobuf.Parser;
 import com.linecorp.decaton.processor.DecatonProcessor;
 import com.linecorp.decaton.protobuf.ProtocolBuffersDeserializer;
 
+import static com.linecorp.decaton.processor.processors.CompactionProcessor.*;
+
 @Configuration
 public class ProcessorConfig {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProcessorConfig.class);
+
     private static final String BOOTSTRAP_SERVERS = "localhost:9092";
     private static final String CLIENT_ID = "decaton-processor";
     private static final String GROUP_ID = "decaton-demo";
@@ -38,9 +46,22 @@ public class ProcessorConfig {
 //        return newProcessorSubscriptionWithRetry(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
 //    }
 
+//    @Bean
+//    public ProcessorSubscription rateLimitProcessorSubscription(HelloTaskProcessor processor) {
+//        return newProcessorSubscriptionWithRateLimiting(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+//    }
+
     @Bean
-    public ProcessorSubscription rateLimitProcessorSubscription(HelloTaskProcessor processor) {
-        return newProcessorSubscriptionWithRateLimiting(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+    public ProcessorSubscription compactionProcessorSubscription(HelloTaskProcessor processor) {
+        return newProcessorSubscriptionWithCompaction(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+    }
+
+    private static Properties propertyConfig(){
+        Properties config = new Properties();
+        config.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, CLIENT_ID);
+        config.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        config.setProperty(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
+        return config;
     }
 
     private static <T extends GeneratedMessageV3> ProcessorSubscription newProcessorSubscription(
@@ -121,11 +142,35 @@ public class ProcessorConfig {
                 .buildAndStart();
     }
 
-    private static Properties propertyConfig(){
-        Properties config = new Properties();
-        config.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, CLIENT_ID);
-        config.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
-        config.setProperty(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
-        return config;
+    private static ProcessorSubscription newProcessorSubscriptionWithCompaction(
+            String subscriptionId, String topic, Parser<HelloTask> parser, DecatonProcessor<HelloTask> processor) {
+
+        ProcessorsBuilder<HelloTask> processorsBuilder =
+                ProcessorsBuilder.consuming(topic, new ProtocolBuffersDeserializer<>(parser))
+                        .thenProcess(createCompactionProcessor())
+                        .thenProcess(processor);
+
+        PropertySupplier propertySupplier =
+                StaticPropertySupplier.of(
+                        Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY, 2),
+                        Property.ofStatic(ProcessorProperties.CONFIG_MAX_PENDING_RECORDS, 100));
+
+        return SubscriptionBuilder.newBuilder(subscriptionId)
+                .processorsBuilder(processorsBuilder)
+                .consumerConfig(propertyConfig())
+                .properties(propertySupplier)
+                .buildAndStart();
+    }
+
+    private static CompactionProcessor<HelloTask> createCompactionProcessor(){
+        return new CompactionProcessor<>(1000L, (left, right) -> {
+            if (left.task().getCreatedAt().getNanos() == right.task().getCreatedAt().getNanos()) {
+                return CompactChoice.PICK_EITHER;
+            } else if (left.task().getCreatedAt().getNanos() > right.task().getCreatedAt().getNanos()) {
+                return CompactChoice.PICK_LEFT;
+            } else {
+                return CompactChoice.PICK_RIGHT;
+            }
+        });
     }
 }
