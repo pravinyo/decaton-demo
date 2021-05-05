@@ -5,6 +5,10 @@ import static org.apache.kafka.clients.producer.ProducerConfig.CLIENT_ID_CONFIG;
 
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,20 +17,32 @@ import com.google.protobuf.MessageLite;
 
 import com.linecorp.decaton.client.DecatonClient;
 import com.linecorp.decaton.protobuf.ProtocolBuffersSerializer;
+import org.springframework.stereotype.Component;
 
+@RefreshScope
+@Component
 @Configuration
 public class ProducerConfig {
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProducerConfig.class);
+
+    @Value("${message.bootstrap_server}")
+    private String BOOTSTRAP_SERVERS;
+
     private static final String CLIENT_ID = "decaton-client";
-    private static final String APPLICATION_ID = "decaton-demo";
-    private static final String TOPIC = "topic1";
+
+    @Value("${message.application_id}")
+    private String APPLICATION_ID;
+
+    @Value("${message.topic}")
+    private String TOPIC;
 
     @Bean
     public DecatonClient<HelloTask> helloClient() {
+        LOGGER.info(toString());
         return newClient(TOPIC);
     }
 
-    private static <T extends MessageLite> DecatonClient<T> newClient(String topic) {
+    private <T extends MessageLite> DecatonClient<T> newClient(String topic) {
         Properties config = new Properties();
         config.setProperty(CLIENT_ID_CONFIG, CLIENT_ID);
         config.setProperty(BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
@@ -35,5 +51,14 @@ public class ProducerConfig {
                             .applicationId(APPLICATION_ID)
                             .producerConfig(config)
                             .build();
+    }
+
+    @Override
+    public String toString() {
+        return "ProducerConfig{" +
+                "BOOTSTRAP_SERVERS='" + BOOTSTRAP_SERVERS + '\'' +
+                ", APPLICATION_ID='" + APPLICATION_ID + '\'' +
+                ", TOPIC='" + TOPIC + '\'' +
+                '}';
     }
 }

@@ -5,7 +5,11 @@ dependencies {
     implementation 'com.linecorp.decaton:decaton-client'
     implementation 'com.linecorp.decaton:decaton-common'
     implementation 'com.linecorp.decaton:decaton-protobuf'
-    implementation 'org.springframework.boot:spring-boot-starter'
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.cloud:spring-cloud-starter-bus-amqp'
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'

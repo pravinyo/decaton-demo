@@ -1,6 +1,6 @@
 plugins {
-    id 'org.springframework.boot' version '2.2.7.RELEASE' apply false
-    id 'io.spring.dependency-management' version '1.0.9.RELEASE' apply false
+    id 'org.springframework.boot' version '2.4.5'
+    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
     id 'com.google.protobuf' version '0.8.12' apply false
 }
 
@@ -17,6 +17,10 @@ subprojects {
         mavenCentral()
     }
 
+    ext{
+        set('springCloudVersion', "2020.0.2")
+    }
+
     dependencyManagement {
         dependencies {
             dependencySet(group: 'com.linecorp.decaton', version: '2.0.0') {
@@ -25,6 +29,9 @@ subprojects {
                 entry 'decaton-processor'
                 entry 'decaton-protobuf'
             }
+        }
+        imports {
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
         }
     }
 

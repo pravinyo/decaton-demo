@@ -22,7 +22,7 @@ public class HelloTaskProducer {
         this.client = client;
     }
 
-    @Scheduled(fixedRate = 5000)
+//    @Scheduled(fixedRate = 5000)
     public void putTasks() {
         for (int i = 0; i < 100; i++) {
             int key = COUNTER.getAndIncrement();
