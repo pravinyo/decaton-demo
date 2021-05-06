@@ -1,6 +1,8 @@
 package com.example.processor;
 
 import com.example.protocol.Tasks.HelloTask;
+import com.example.utils.ConfigProperties;
+import com.example.utils.CustomSpringConfigPropertySupplier;
 import com.google.protobuf.GeneratedMessageV3;
 import com.google.protobuf.Parser;
 import com.linecorp.decaton.processor.DecatonProcessor;
@@ -10,8 +12,7 @@ import com.linecorp.decaton.protobuf.ProtocolBuffersDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
@@ -21,35 +22,15 @@ import java.util.Properties;
 
 import static com.linecorp.decaton.processor.processors.CompactionProcessor.CompactChoice;
 
-@RefreshScope
 @Configuration
 @Component
 public class ProcessorConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(ProcessorConfig.class);
 
-    @Value("${message.bootstrap_server}")
-    private String BOOTSTRAP_SERVERS;
+    @Autowired
+    private ConfigProperties configProperties;
 
     private static final String CLIENT_ID = "decaton-processor";
-
-    @Value("${message.group_id}")
-    private String GROUP_ID;
-
-    @Value("${message.subscription_id}")
-    private String SUBSCRIPTION_ID;
-
-    @Value("${message.topic}")
-    private String TOPIC;
-
-    @Value("${message.per.partition.processing_rate}")
-    private long DECATON_MESSAGE_PROCESSING_RATE;
-
-    @Value("${message.per.partition.concurrent_thread_count}")
-    private int DECATON_MESSAGE_CONCURRENT_THREAD_COUNT;
-
-    @Value("${message.max_pending_record}")
-    private int DECATON_MAX_PENDING_RECORD;
-
 
     /*
     @Bean
@@ -81,14 +62,17 @@ public class ProcessorConfig {
     @Bean
     public ProcessorSubscription ignoreKeysProcessorSubscription(HelloTaskProcessor processor) {
         LOGGER.info(toString());
-        return newProcessorSubscriptionWithKeyIgnore(SUBSCRIPTION_ID, TOPIC, HelloTask.parser(), processor);
+        return newProcessorSubscriptionWithDynamicProperty(
+                configProperties.getSubscriptionId(),
+                configProperties.getTopic(),
+                HelloTask.parser(), processor);
     }
 
     private Properties propertyConfig() {
         Properties config = new Properties();
         config.setProperty(ConsumerConfig.CLIENT_ID_CONFIG, CLIENT_ID);
-        config.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
-        config.setProperty(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
+        config.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, configProperties.getBootstrapServers());
+        config.setProperty(ConsumerConfig.GROUP_ID_CONFIG, configProperties.getGroupId());
         return config;
     }
 
@@ -211,10 +195,30 @@ public class ProcessorConfig {
 
         PropertySupplier propertySupplier =
                 StaticPropertySupplier.of(
-                        Property.ofStatic(ProcessorProperties.CONFIG_IGNORE_KEYS, IgnoreKeyList.getKeysToIgnore()),
-                        Property.ofStatic(ProcessorProperties.CONFIG_PROCESSING_RATE, DECATON_MESSAGE_PROCESSING_RATE),
-                        Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY, DECATON_MESSAGE_CONCURRENT_THREAD_COUNT),
-                        Property.ofStatic(ProcessorProperties.CONFIG_MAX_PENDING_RECORDS, DECATON_MAX_PENDING_RECORD));
+                        Property.ofStatic(ProcessorProperties.CONFIG_IGNORE_KEYS,
+                                configProperties.getKeysToIgnore()),
+                        Property.ofStatic(ProcessorProperties.CONFIG_PROCESSING_RATE,
+                                configProperties.getMessageProcessingRate()),
+                        Property.ofStatic(ProcessorProperties.CONFIG_PARTITION_CONCURRENCY,
+                                configProperties.getMessageConcurrency()),
+                        Property.ofStatic(ProcessorProperties.CONFIG_MAX_PENDING_RECORDS,
+                                configProperties.getMaxPendingRecords()));
+
+        return SubscriptionBuilder.newBuilder(subscriptionId)
+                .processorsBuilder(processorsBuilder)
+                .consumerConfig(propertyConfig())
+                .properties(propertySupplier)
+                .buildAndStart();
+    }
+
+    private <T extends GeneratedMessageV3> ProcessorSubscription newProcessorSubscriptionWithDynamicProperty(
+            String subscriptionId, String topic, Parser<T> parser, DecatonProcessor<T> processor) {
+
+        ProcessorsBuilder<T> processorsBuilder =
+                ProcessorsBuilder.consuming(topic, new ProtocolBuffersDeserializer<>(parser))
+                        .thenProcess(processor);
+
+        PropertySupplier propertySupplier = new CustomSpringConfigPropertySupplier(configProperties);
 
         return SubscriptionBuilder.newBuilder(subscriptionId)
                 .processorsBuilder(processorsBuilder)
@@ -225,14 +229,6 @@ public class ProcessorConfig {
 
     @Override
     public String toString() {
-        return "ProcessorConfig{" +
-                "BOOTSTRAP_SERVERS='" + BOOTSTRAP_SERVERS + '\'' +
-                ", GROUP_ID='" + GROUP_ID + '\'' +
-                ", SUBSCRIPTION_ID='" + SUBSCRIPTION_ID + '\'' +
-                ", TOPIC='" + TOPIC + '\'' +
-                ", DECATON_MESSAGE_PROCESSING_RATE=" + DECATON_MESSAGE_PROCESSING_RATE +
-                ", DECATON_MESSAGE_CONCURRENT_THREAD_COUNT=" + DECATON_MESSAGE_CONCURRENT_THREAD_COUNT +
-                ", DECATON_MAX_PENDING_RECORD=" + DECATON_MAX_PENDING_RECORD +
-                '}';
+        return configProperties.toString();
     }
 }
