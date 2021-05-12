@@ -12,6 +12,8 @@ public class ConfigController {
 
     @GetMapping("/config")
     public String getConfig(){
+        JVMDetails.getMemoryStatistics();
+        JVMDetails.printGCDetails();
         return config.toString();
     }
 }
